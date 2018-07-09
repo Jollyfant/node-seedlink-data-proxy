@@ -1,0 +1,19 @@
+{
+  "name": "nodejs-seedlink-data-proxy",
+  "version": "1.0.0",
+  "description": "NodeJS proxy for Seedlink data samples",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "dependencies": {
+    "ws": "^5.2.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "author": "Mathijs Koymans",
+  "license": "MIT"
+}
