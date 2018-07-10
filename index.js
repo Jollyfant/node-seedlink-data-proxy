@@ -45,7 +45,7 @@ const SeedlinkWebsocket = function(configuration, callback) {
 
   this.enableHeartbeat();
 
-  // Create all rooms
+  // Create all channels
   this.createSeedlinkProxies();
 
   // When a connection is made to the websocket
@@ -137,11 +137,11 @@ SeedlinkWebsocket.prototype.checkHeartbeat = function(socket) {
 SeedlinkWebsocket.prototype.unsubscribeAll = function(socket) {
 
   /* Function SeedlinkWebsocket.unsubscribeAll
-   * Unsubscribes socket from all rooms
+   * Unsubscribes socket from all channels
    */
 
-  Object.values(this.rooms).forEach(function(room) {
-    this.unsubscribe(room.name, socket);
+  Object.values(this.channels).forEach(function(channel) {
+    this.unsubscribe(channel.name, socket);
   }.bind(this));
 
 }
@@ -152,63 +152,63 @@ SeedlinkWebsocket.prototype.createSeedlinkProxies = function() {
    * Initializes the configured seedlink proxies
    */
 
-  this.rooms = new Object();
+  this.channels = new Object();
 
-  // Read the room configuration
-  require("./room-config").forEach(function(room) {
-    this.rooms[room.name] = new SeedlinkProxy(room);
+  // Read the channel configuration
+  require("./channel-config").forEach(function(channel) {
+    this.channels[channel.name] = new SeedlinkProxy(channel);
   }.bind(this));
 
 }
 
-SeedlinkWebsocket.prototype.getSeedlinkProxy = function(room) {
+SeedlinkWebsocket.prototype.getSeedlinkProxy = function(channel) {
 
   /* Function SeedlinkWebsocket.getSeedlinkProxy
    * Returns the particular seedlink proxy with an identifier
    */
 
-  return this.rooms[room];
+  return this.channels[channel];
 
 }
 
-SeedlinkWebsocket.prototype.unsubscribe = function(room, socket) {
+SeedlinkWebsocket.prototype.unsubscribe = function(channel, socket) {
 
   /* Function SeedlinkWebsocket.unsubscribe
    * Unsubscribes from a particular data Seedlink stream
    */
 
-  // Sanity check if the room exists
-  if(!this.roomExists(room)) {
+  // Sanity check if the channel exists
+  if(!this.channelExists(channel)) {
     return socket.send(JSON.stringify({"error": "Invalid unsubscription requested."}));
   }
 
   // Get the particular seedlink proxy
-  this.getSeedlinkProxy(room).removeSocket(socket);
+  this.getSeedlinkProxy(channel).removeSocket(socket);
 
 }
 
-SeedlinkWebsocket.prototype.roomExists = function(room) {
+SeedlinkWebsocket.prototype.channelExists = function(channel) {
 
-  /* Function SeedlinkWebsocket.roomExists
-   * Checks whether a room name has been configured
+  /* Function SeedlinkWebsocket.channelExists
+   * Checks whether a channel name has been configured
    */
 
-  return this.rooms.hasOwnProperty(room);
+  return this.channels.hasOwnProperty(channel);
 
 }
 
-SeedlinkWebsocket.prototype.subscribe = function(room, socket) {
+SeedlinkWebsocket.prototype.subscribe = function(channel, socket) {
 
   /* Function SeedlinkWebsocket.subscribe
    * Subscribes from a particular data Seedlink stream
    */
 
-  if(!this.roomExists(room)) {
+  if(!this.channelExists(channel)) {
     return socket.send(JSON.stringify({"error": "Invalid subscription requested."}));
   }
 
-  // Add the socket to the room
-  this.getSeedlinkProxy(room).addSocket(socket);
+  // Add the socket to the channel
+  this.getSeedlinkProxy(channel).addSocket(socket);
 
 }
 
