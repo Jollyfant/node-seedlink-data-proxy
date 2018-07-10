@@ -1,16 +1,5 @@
 {
   "__NAME__": "nodejs-seedlink-data-proxy",
   "HOST": "0.0.0.0",
-  "PORT": 8087,
-  "ROOMS": [{
-    "name": "NL.HGN",
-    "host": "eida.orfeus-eu.org",
-    "port": 18000,
-    "selectors": [{
-      "network": "NL",
-      "station": "HGN",
-      "channel": "???",
-      "location": "??"
-    }]
-  }]
+  "PORT": 8087
 }

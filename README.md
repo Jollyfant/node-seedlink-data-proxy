@@ -8,6 +8,9 @@ A proxy written for NodeJS that relays unpacked data samples from configured See
 ## Configuration
 Modify config.json to suit your needs.
 
+## Room Configuration
+A room describes a certain channel that can be subcribed to and is identified by a name. Each room will create a single Seedlink connection when users are subscribed. Users that are subscribed to a room will receive data packets attributes to that channel.
+
 ## Running
 
     node index.js
@@ -28,7 +31,7 @@ To communicate with the websocket server you will need to write an (un)subscript
     {"subscribe": "NL.HGN"}
     {"unsubscribe": "NL.HGN"}
 
-Once accepted, the server will start writing over the websocket.
+Once accepted, the server will start writing over the websocket. Multiple subscriptions can be active per user.
 
 ## Example
 

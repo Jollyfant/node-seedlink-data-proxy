@@ -34,6 +34,9 @@ const SeedlinkWebsocket = function(configuration, callback) {
   // Create a websocket server
   this.websocket = new websocket.Server({"host": host, "port": port});
 
+  // Create all rooms
+  this.createSeedlinkProxies();
+
   // When a connection is made to the websocket
   this.websocket.on("connection", function connection(socket) {
 
@@ -60,9 +63,6 @@ const SeedlinkWebsocket = function(configuration, callback) {
  
   }.bind(this));
 
-  // Create all rooms
-  this.createSeedlinkProxies();
-
   callback(configuration.__NAME__, host, port);
 
 }
@@ -75,7 +75,8 @@ SeedlinkWebsocket.prototype.createSeedlinkProxies = function() {
 
   this.rooms = new Object();
 
-  this.configuration.ROOMS.forEach(function(room) {
+  // Read the room configuration
+  require("./room-config").forEach(function(room) {
     this.rooms[room.name] = new SeedlinkProxy(room);
   }.bind(this));
 

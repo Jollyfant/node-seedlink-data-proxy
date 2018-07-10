@@ -1,0 +1,21 @@
+[{
+  "name": "NL.HGN",
+  "host": "eida.orfeus-eu.org",
+  "port": 18000,
+  "selectors": [{
+    "network": "NL",
+    "station": "HGN",
+    "channel": "???",
+    "location": "??"
+  }]
+}, {
+  "name": "NL.WTSB",
+  "host": "eida.orfeus-eu.org",
+  "port": 18000,
+  "selectors": [{
+    "network": "NL",
+    "station": "WTSB",
+    "channel": "???",
+    "location": "??"
+  }]
+}]
