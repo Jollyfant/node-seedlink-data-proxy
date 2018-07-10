@@ -9,8 +9,8 @@ Lightweight NodeJS server capable of communicating over the Seedlink protocol, b
 ## Configuration
 Modify config.json to suit your needs.
 
-## Room Configuration
-A channel describes a configured data stream that can be subcribed to and is identified by a name. Each channel will create a single Seedlink connection when users are subscribed. Users that are subscribed to a channel will receive data packets attributed to that particular channel.
+## Channel Configuration
+A channel describes a configured data stream that can be subscribed to and is identified by a name. Each channel will create a single Seedlink connection when users are subscribed. Users that are subscribed to a channel will receive data packets attributed to that particular channel.
 
 ## Running
 

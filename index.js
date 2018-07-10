@@ -32,15 +32,6 @@ const SeedlinkWebsocket = function(configuration, callback) {
    * Seedlink server to the browser
    */
 
-  function heartbeat() {
-
-    /* function heartbeat
-     * Sets heartbeat state to received
-     */
-    this.__receivedHeartbeat = true;
-
-  }
-
   this.configuration = configuration;
 
   // Get process environment variables (Docker)
@@ -50,61 +41,74 @@ const SeedlinkWebsocket = function(configuration, callback) {
   // Create a websocket server
   this.websocket = new websocket.Server({"host": host, "port": port});
 
+  // Create a logger
   this.logger = this.setupLogger();
-  this.enableHeartbeat();
 
   // Create all channels
   this.createSeedlinkProxies();
 
   // When a connection is made to the websocket
-  this.websocket.on("connection", function(socket, request) {
-
-    // Attach some metadata to the socket
-    socket.__receivedHeartbeat = true;
-
-    // Socket was closed: unsubscribe all
-    socket.on("close", function() {
-      this.unsubscribeAll(socket);
-    }.bind(this));
-
-    // Set the pong listener
-    socket.on("pong", heartbeat);
-
-    // Called when writing to socket
-    socket.on("write", function(json) {
-
-      const __noop = () => {}
-
-      // Skip succes, error messages to clients
-      if(!json.success && !json.errror) {
-        this.logMessage(request, json);
-      }
-
-      // Write data over socket
-      socket.send(JSON.stringify(json), __noop);
-
-    }.bind(this));
-
-    // Message has been received: try parsing JSON
-    socket.on("message", function(message) {
-
-      try {
-        this.handleIncomingMessage(socket, message);
-      } catch(exception) {
-        if(this.configuration.__DEBUG__) {
-          socket.emit("write", {"error": exception.stack});
-        } else {
-          socket.emit("write", {"error": exception.message});
-        }
-      }
-
-    }.bind(this));
-  
-    socket.emit("write", {"success": "Connected to Seedlink Proxy."});
- 
-  }.bind(this));
+  this.websocket.on("connection", this.attachSocketHandlers.bind(this));
 
   callback(configuration.__NAME__, host, port);
+
+}
+
+SeedlinkWebsocket.prototype.attachSocketHandlers = function(socket, request) {
+
+  /* function SeedlinkWebsocket.attachSocketHandlers
+   * Attaches listeners to the websocket
+   */
+
+  function heartbeat() {
+
+    /* function heartbeat
+     * Sets heartbeat state to received
+     */
+
+    this._receivedHeartbeat = true;
+
+  }
+
+  socket.emit("write", {"success": "Connected to Seedlink Proxy."});
+  socket._receivedHeartbeat = true;
+
+  // Socket was closed: unsubscribe from all rooms
+  socket.on("close", function() {
+    this.unsubscribeAll(socket);
+  }.bind(this));
+
+  // Called when writing to socket
+  socket.on("write", function(json) {
+
+    // Skip succes, error messages to clients
+    if(!json.success && !json.error) {
+      this.logRecordMessage(request, json);
+    }
+
+    // Write the data over socket (NOOP callback)
+    socket.send(JSON.stringify(json), Function.prototype);
+
+  }.bind(this));
+
+  // Message has been received: try parsing JSON
+  socket.on("message", function(message) {
+    try {
+      this.handleIncomingMessage(socket, message);
+    } catch(exception) {
+      if(this.configuration.__DEBUG__) {
+        socket.emit("write", {"error": exception.stack});
+      } else {
+        socket.emit("write", {"error": exception.message});
+      }
+    }
+  }.bind(this));
+
+  // Set the pong listener
+  socket.on("pong", heartbeat);
+
+  // Enable pinging of clients
+  this.enableHeartbeat();
 
 }
 
@@ -119,9 +123,9 @@ SeedlinkWebsocket.prototype.setupLogger = function() {
 
 }
 
-SeedlinkWebsocket.prototype.logMessage = function(request, json) {
+SeedlinkWebsocket.prototype.logRecordMessage = function(request, json) {
 
-  /* Function SeedlinkWebsocket.logMessage
+  /* Function SeedlinkWebsocket.logRecordMessage
    * Writes websocket mSEED record messages to logfile
    */
 
@@ -178,12 +182,12 @@ SeedlinkWebsocket.prototype.checkHeartbeat = function(socket) {
    */
 
   // Socket did not response to heartbeat since last check
-  if(!socket.__receivedHeartbeat) {
+  if(!socket._receivedHeartbeat) {
     return socket.terminate();
   }
   
   // Set up for a new heartbeat
-  socket.__receivedHeartbeat = false;
+  socket._receivedHeartbeat = false;
   socket.ping();
 
 }
@@ -194,6 +198,7 @@ SeedlinkWebsocket.prototype.unsubscribeAll = function(socket) {
    * Unsubscribes socket from all channels
    */
 
+  // Go over all channels and unsubscribe the socket
   Object.values(this.channels).forEach(function(channel) {
     this.unsubscribe(channel.name, socket);
   }.bind(this));
@@ -208,7 +213,7 @@ SeedlinkWebsocket.prototype.createSeedlinkProxies = function() {
 
   this.channels = new Object();
 
-  // Read the channel configuration
+  // Read the channel configuration and create new sleeping proxies
   require("./channel-config").forEach(function(channel) {
     this.channels[channel.name] = new SeedlinkProxy(channel);
   }.bind(this));
