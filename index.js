@@ -13,7 +13,14 @@
 
 "use strict";
 
+// Native libs
+const fs = require("fs");
+const path = require("path");
+
+// Third party libs
 const websocket = require("ws");
+
+// Application libs
 const SeedlinkProxy = require("./lib/seedlink-proxy");
 
 const __VERSION__ = "1.0.0";
@@ -30,7 +37,7 @@ const SeedlinkWebsocket = function(configuration, callback) {
     /* function heartbeat
      * Sets heartbeat state to received
      */
-    this.receivedHeartbeat = true;
+    this.__receivedHeartbeat = true;
 
   }
 
@@ -43,15 +50,17 @@ const SeedlinkWebsocket = function(configuration, callback) {
   // Create a websocket server
   this.websocket = new websocket.Server({"host": host, "port": port});
 
+  this.logger = this.setupLogger();
   this.enableHeartbeat();
 
   // Create all channels
   this.createSeedlinkProxies();
 
   // When a connection is made to the websocket
-  this.websocket.on("connection", function connection(socket) {
+  this.websocket.on("connection", function(socket, request) {
 
-    socket.receivedHeartbeat = true;
+    // Attach some metadata to the socket
+    socket.__receivedHeartbeat = true;
 
     // Socket was closed: unsubscribe all
     socket.on("close", function() {
@@ -61,6 +70,21 @@ const SeedlinkWebsocket = function(configuration, callback) {
     // Set the pong listener
     socket.on("pong", heartbeat);
 
+    // Called when writing to socket
+    socket.on("write", function(json) {
+
+      const __noop = () => {}
+
+      // Skip succes, error messages to clients
+      if(!json.success && !json.errror) {
+        this.logMessage(request, json);
+      }
+
+      // Write data over socket
+      socket.send(JSON.stringify(json), __noop);
+
+    }.bind(this));
+
     // Message has been received: try parsing JSON
     socket.on("message", function(message) {
 
@@ -68,19 +92,49 @@ const SeedlinkWebsocket = function(configuration, callback) {
         this.handleIncomingMessage(socket, message);
       } catch(exception) {
         if(this.configuration.__DEBUG__) {
-          socket.send(JSON.stringify({"error": exception.stack}));
+          socket.emit("write", {"error": exception.stack});
         } else {
-          socket.send(JSON.stringify({"error": exception.message}));
+          socket.emit("write", {"error": exception.message});
         }
       }
 
     }.bind(this));
   
-    socket.send(JSON.stringify({"success": "Connected to Seedlink Proxy."}));
+    socket.emit("write", {"success": "Connected to Seedlink Proxy."});
  
   }.bind(this));
 
   callback(configuration.__NAME__, host, port);
+
+}
+
+SeedlinkWebsocket.prototype.setupLogger = function() {
+
+  /* Function SeedlinkWebsocket.setupLogger
+   * Sets up the service logfile
+   */
+
+  fs.existsSync(path.join(__dirname, "logs")) || fs.mkdirSync(path.join(__dirname, "logs"));
+  return fs.createWriteStream(path.join(__dirname, "logs", "service.log"), {"flags": "a"});
+
+}
+
+SeedlinkWebsocket.prototype.logMessage = function(request, json) {
+
+  /* Function SeedlinkWebsocket.logMessage
+   * Writes websocket mSEED record messages to logfile
+   */
+
+  this.logger.write(JSON.stringify({
+    "timestamp": new Date().toISOString(),
+    "network": json.network,
+    "station": json.station,
+    "location": json.location,
+    "channel": json.channel,
+    "nSamples": json.data.length,
+    "agent": request.headers["user-agent"] || null,
+    "client": request.connection.remoteAddress || request.headers["x-forwarded-for"] 
+  }) + "\n");
 
 }
 
@@ -108,7 +162,7 @@ SeedlinkWebsocket.prototype.enableHeartbeat = function() {
    * Enable heartbeat polling each connected websocket
    */
 
-  const HEARTBEAT_INTERVAL_MS = 600;
+  const HEARTBEAT_INTERVAL_MS = 60000;
 
   setInterval(function() {
     this.websocket.clients.forEach(this.checkHeartbeat);
@@ -124,12 +178,12 @@ SeedlinkWebsocket.prototype.checkHeartbeat = function(socket) {
    */
 
   // Socket did not response to heartbeat since last check
-  if(!socket.receivedHeartbeat) {
+  if(!socket.__receivedHeartbeat) {
     return socket.terminate();
   }
   
   // Set up for a new heartbeat
-  socket.receivedHeartbeat = false;
+  socket.__receivedHeartbeat = false;
   socket.ping();
 
 }
@@ -179,7 +233,7 @@ SeedlinkWebsocket.prototype.unsubscribe = function(channel, socket) {
 
   // Sanity check if the channel exists
   if(!this.channelExists(channel)) {
-    return socket.send(JSON.stringify({"error": "Invalid unsubscription requested."}));
+    return socket.emit("write", {"error": "Invalid unsubscription requested."});
   }
 
   // Get the particular seedlink proxy
@@ -204,7 +258,7 @@ SeedlinkWebsocket.prototype.subscribe = function(channel, socket) {
    */
 
   if(!this.channelExists(channel)) {
-    return socket.send(JSON.stringify({"error": "Invalid subscription requested."}));
+    return socket.emit("write", {"error": "Invalid subscription requested."});
   }
 
   // Add the socket to the channel
