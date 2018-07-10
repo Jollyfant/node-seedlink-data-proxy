@@ -25,6 +25,15 @@ const SeedlinkWebsocket = function(configuration, callback) {
    * Seedlink server to the browser
    */
 
+  function heartbeat() {
+
+    /* function heartbeat
+     * Sets heartbeat state to received
+     */
+    this.receivedHeartbeat = true;
+
+  }
+
   this.configuration = configuration;
 
   // Get process environment variables (Docker)
@@ -34,49 +43,94 @@ const SeedlinkWebsocket = function(configuration, callback) {
   // Create a websocket server
   this.websocket = new websocket.Server({"host": host, "port": port});
 
+  this.enableHeartbeat();
+
   // Create all rooms
   this.createSeedlinkProxies();
 
   // When a connection is made to the websocket
   this.websocket.on("connection", function connection(socket) {
 
+    socket.receivedHeartbeat = true;
+
     // Socket was closed: unsubscribe all
     socket.on("close", function() {
       this.unsubscribeAll(socket);
     }.bind(this));
-  
+
+    // Set the pong listener
+    socket.on("pong", heartbeat);
+
     // Message has been received: try parsing JSON
     socket.on("message", function(message) {
 
       try {
-
-        var json = JSON.parse(message);
-
-        if(json.subscribe) {
-          this.subscribe(json.subscribe, socket);
-        } else if(json.unsubscribe) {
-          this.unsubscribe(json.unsubscribe, socket);
-        } else {
-          throw new Error("Invalid JSON message specified.");
-        }
-
+        this.handleIncomingMessage(socket, message);
       } catch(exception) {
-
         if(this.configuration.__DEBUG__) {
-          socket.send(exception.stack);
+          socket.send(JSON.stringify({"error": exception.stack}));
         } else {
-          socket.send(exception.message);
+          socket.send(JSON.stringify({"error": exception.message}));
         }
-
       }
 
     }.bind(this));
   
-    socket.send("Connected to Seedlink.");
+    socket.send(JSON.stringify({"success": "Connected to Seedlink Proxy."}));
  
   }.bind(this));
 
   callback(configuration.__NAME__, host, port);
+
+}
+
+SeedlinkWebsocket.prototype.handleIncomingMessage = function(socket, message) {
+
+  /* Function SeedlinkWebsocket.handleIncomingMessage
+   * Code to handle messages send to the server over the websocket
+   */
+
+  var json = JSON.parse(message);
+
+  if(json.subscribe) {
+    this.subscribe(json.subscribe, socket);
+  } else if(json.unsubscribe) {
+    this.unsubscribe(json.unsubscribe, socket);
+  } else {
+    throw new Error("Invalid JSON message specified.");
+  }
+
+}
+
+SeedlinkWebsocket.prototype.enableHeartbeat = function() {
+
+  /* Function SeedlinkWebsocket.enableHeartbeat
+   * Enable heartbeat polling each connected websocket
+   */
+
+  const HEARTBEAT_INTERVAL_MS = 600;
+
+  setInterval(function() {
+    this.websocket.clients.forEach(this.checkHeartbeat);
+  }.bind(this), HEARTBEAT_INTERVAL_MS);
+
+}
+
+SeedlinkWebsocket.prototype.checkHeartbeat = function(socket) {
+
+  /* Function SeedlinkWebsocket.checkHeartbeat
+   * Checks whether the socket is still alive and responds
+   * to ping messages
+   */
+
+  // Socket did not response to heartbeat since last check
+  if(!socket.receivedHeartbeat) {
+    return socket.terminate();
+  }
+  
+  // Set up for a new heartbeat
+  socket.receivedHeartbeat = false;
+  socket.ping();
 
 }
 
@@ -125,7 +179,7 @@ SeedlinkWebsocket.prototype.unsubscribe = function(room, socket) {
 
   // Sanity check if the room exists
   if(!this.roomExists(room)) {
-    return socket.send("Invalid unsubscription requested.");
+    return socket.send(JSON.stringify({"error": "Invalid unsubscription requested."}));
   }
 
   // Get the particular seedlink proxy
@@ -150,7 +204,7 @@ SeedlinkWebsocket.prototype.subscribe = function(room, socket) {
    */
 
   if(!this.roomExists(room)) {
-    return socket.send("Invalid subscription requested.");
+    return socket.send(JSON.stringify({"error": "Invalid subscription requested."}));
   }
 
   // Add the socket to the room
