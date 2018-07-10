@@ -10,7 +10,7 @@
   }]
 }, {
   "name": "NL.WTSB",
-  "host": "eidas.orfeus-eu.org",
+  "host": "eida.orfeus-eu.org",
   "port": 18000,
   "selectors": [{
     "network": "NL",
