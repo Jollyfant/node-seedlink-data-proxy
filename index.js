@@ -40,21 +40,34 @@ const SeedlinkWebsocket = function(configuration, callback) {
   // When a connection is made to the websocket
   this.websocket.on("connection", function connection(socket) {
 
+    // Socket was closed: unsubscribe all
+    socket.on("close", function() {
+      this.unsubscribeAll(socket);
+    }.bind(this));
+  
     // Message has been received: try parsing JSON
     socket.on("message", function(message) {
 
       try {
+
         var json = JSON.parse(message);
+
         if(json.subscribe) {
           this.subscribe(json.subscribe, socket);
         } else if(json.unsubscribe) {
           this.unsubscribe(json.unsubscribe, socket);
         } else {
-          socket.send("Invalid message specified.");
+          throw new Error("Invalid JSON message specified.");
         }
 
       } catch(exception) {
-        socket.send("Invalid JSON message specified."); 
+
+        if(this.configuration.__DEBUG__) {
+          socket.send(exception.stack);
+        } else {
+          socket.send(exception.message);
+        }
+
       }
 
     }.bind(this));
@@ -64,6 +77,18 @@ const SeedlinkWebsocket = function(configuration, callback) {
   }.bind(this));
 
   callback(configuration.__NAME__, host, port);
+
+}
+
+SeedlinkWebsocket.prototype.unsubscribeAll = function(socket) {
+
+  /* Function SeedlinkWebsocket.unsubscribeAll
+   * Unsubscribes socket from all rooms
+   */
+
+  Object.values(this.rooms).forEach(function(room) {
+    this.unsubscribe(room.name, socket);
+  }.bind(this));
 
 }
 
@@ -99,27 +124,22 @@ SeedlinkWebsocket.prototype.unsubscribe = function(room, socket) {
    */
 
   // Sanity check if the room exists
-  if(!this.rooms.hasOwnProperty(room)) {
+  if(!this.roomExists(room)) {
     return socket.send("Invalid unsubscription requested.");
   }
 
   // Get the particular seedlink proxy
-  var seedlinkProxy = this.getSeedlinkProxy(room);
+  this.getSeedlinkProxy(room).removeSocket(socket);
 
-  // Remove the socket from the list
-  var index = seedlinkProxy._sockets.indexOf(socket);
+}
 
-  // Does not exist in the list
-  if(index === -1) {
-    return;
-  }
+SeedlinkWebsocket.prototype.roomExists = function(room) {
 
-  seedlinkProxy._sockets.splice(index, 1);
+  /* Function SeedlinkWebsocket.roomExists
+   * Checks whether a room name has been configured
+   */
 
-  // Disconnect the proxy if no users are present
-  if(seedlinkProxy._sockets.length === 0) {
-    seedlinkProxy.disconnect();
-  }
+  return this.rooms.hasOwnProperty(room);
 
 }
 
@@ -129,21 +149,12 @@ SeedlinkWebsocket.prototype.subscribe = function(room, socket) {
    * Subscribes from a particular data Seedlink stream
    */
 
-  if(!this.rooms.hasOwnProperty(room)) {
+  if(!this.roomExists(room)) {
     return socket.send("Invalid subscription requested.");
   }
 
-  var seedlinkProxy = this.getSeedlinkProxy(room);
-
-  // Add the socket to the room (not twice)
-  if(!seedlinkProxy._sockets.includes(socket)) {
-    seedlinkProxy._sockets.push(socket);
-  }
-
-  // Connect if required 
-  if(!seedlinkProxy._connected) {
-    seedlinkProxy.connect();
-  }
+  // Add the socket to the room
+  this.getSeedlinkProxy(room).addSocket(socket);
 
 }
 
