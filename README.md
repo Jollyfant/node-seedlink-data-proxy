@@ -42,13 +42,13 @@ Once accepted, the server will start writing over the websocket.
 Will receive:
 
     {
-	"start": 1531139771269,
-	"end": 1531139780894,
+        "start": 1531139771269,
+        "end": 1531139780894,
         "data": [...],
-	"network": "NL",
-	"station": "HGN",
-	"location": "02",
-	"channel": "BHN",
-	"sampleRate": 40,
-	"id": "NL.HGN.02.BHN"
+        "network": "NL",
+        "station": "HGN",
+        "location": "02",
+        "channel": "BHN",
+        "sampleRate": 40,
+        "id": "NL.HGN.02.BHN"
     }

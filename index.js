@@ -1,3 +1,16 @@
+/*
+ * nodejs-seedlink-data-proxy
+ *
+ * Seedlink server proxy written for NodeJS. Connects to 
+ * multiple seedlink servers and broadcasts unpacked data samples
+ * over HTML5 websockets.
+ *
+ * Copyright: ORFEUS Data Center, 2018
+ * Author: Mathijs Koymans
+ * Licensed under MIT
+ *
+ */
+
 "use strict";
 
 const websocket = require("ws");
@@ -141,7 +154,7 @@ if(require.main === module) {
 
   const CONFIG = require("./config");
 
-  // Start up the WFCatalog
+  // Start the microservice
   new module.exports.server(CONFIG, function(name, host, port) {
     console.log(name + " microservice has been started on " + host + ":" + port);
   });
