@@ -6,6 +6,10 @@
   "directories": {
     "lib": "lib"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jollyfant/node-seedlink-data-proxy.git"
+  },
   "dependencies": {
     "libmseedjs": "^1.0.0",
     "ws": "^5.2.1"
