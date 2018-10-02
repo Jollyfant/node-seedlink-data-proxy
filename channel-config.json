@@ -1,10 +1,30 @@
 [{
-  "name": "NL.HGN",
-  "host": "eida.bgr.de",
+  "name": "NL.WTSB",
+  "host": "eida.orfeus-eu.org",
   "port": 18000,
   "selectors": [{
-    "network": "GR",
-    "station": "RETH",
+    "network": "NL",
+    "station": "WTSB",
+    "channel": "???",
+    "location": "??"
+  }]
+}, {
+  "name": "NL.HGN",
+  "host": "eida.orfeus-eu.org",
+  "port": 18000,
+  "selectors": [{
+    "network": "NL",
+    "station": "HGN",
+    "channel": "???",
+    "location": "??"
+  }]
+}, {
+  "name": "NL.OPLO",
+  "host": "eida.orfeus-eu.org",
+  "port": 18000,
+  "selectors": [{
+    "network": "NL",
+    "station": "OPLO",
     "channel": "???",
     "location": "??"
   }]

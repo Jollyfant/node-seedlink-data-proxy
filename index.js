@@ -13,16 +13,6 @@
 
 "use strict";
 
-// Native libs
-const fs = require("fs");
-const path = require("path");
-
-// Third party libs
-const websocket = require("ws");
-
-// Application libs
-const SeedlinkProxy = require("./lib/seedlink-proxy");
-
 const __VERSION__ = "1.0.0";
 
 const SeedlinkWebsocket = function(configuration, callback) {
@@ -31,6 +21,8 @@ const SeedlinkWebsocket = function(configuration, callback) {
    * Websocket server that relays unpacked data from arbitrary
    * Seedlink server to the browser
    */
+
+  const websocket = require("ws");
 
   this.configuration = configuration;
 
@@ -56,13 +48,15 @@ const SeedlinkWebsocket = function(configuration, callback) {
 
 SeedlinkWebsocket.prototype.attachSocketHandlers = function(socket, request) {
 
-  /* function SeedlinkWebsocket.attachSocketHandlers
+  /*
+   * Function SeedlinkWebsocket.attachSocketHandlers
    * Attaches listeners to the websocket
    */
 
   function heartbeat() {
 
-    /* function heartbeat
+    /*
+     * Function heartbeat
      * Sets heartbeat state to received
      */
 
@@ -70,7 +64,9 @@ SeedlinkWebsocket.prototype.attachSocketHandlers = function(socket, request) {
 
   }
 
-  socket.emit("write", {"success": "Connected to Seedlink Proxy."});
+  // User feedback that connection is ok
+  this.write(socket, "Connected to Seedlink Proxy.");
+
   socket._receivedHeartbeat = true;
 
   // Socket was closed: unsubscribe from all rooms
@@ -93,15 +89,13 @@ SeedlinkWebsocket.prototype.attachSocketHandlers = function(socket, request) {
 
   // Message has been received: try parsing JSON
   socket.on("message", function(message) {
+
     try {
       this.handleIncomingMessage(socket, message);
     } catch(exception) {
-      if(this.configuration.__DEBUG__) {
-        socket.emit("write", {"error": exception.stack});
-      } else {
-        socket.emit("write", {"error": exception.message});
-      }
+      this.write(socket, exception);
     }
+
   }.bind(this));
 
   // Set the pong listener
@@ -114,22 +108,42 @@ SeedlinkWebsocket.prototype.attachSocketHandlers = function(socket, request) {
 
 SeedlinkWebsocket.prototype.setupLogger = function() {
 
-  /* Function SeedlinkWebsocket.setupLogger
+  /*
+   * Function SeedlinkWebsocket.setupLogger
    * Sets up the service logfile
    */
 
-  fs.existsSync(path.join(__dirname, "logs")) || fs.mkdirSync(path.join(__dirname, "logs"));
-  return fs.createWriteStream(path.join(__dirname, "logs", "service.log"), {"flags": "a"});
+  // Lazy module loading
+  const fs = require("fs");
+  const path = require("path");
+
+  var logDirectory = path.join(__dirname, "logs");
+
+  // Check if the log directory exists else create it
+  fs.existsSync(logDirectory) || fs.mkdirSync(logDirectory);
+  return fs.createWriteStream(path.join(logDirectory, "service.log"), {"flags": "a"});
 
 }
 
 SeedlinkWebsocket.prototype.logRecordMessage = function(request, json) {
 
-  /* Function SeedlinkWebsocket.logRecordMessage
+  /*
+   * Function SeedlinkWebsocket.logRecordMessage
    * Writes websocket mSEED record messages to logfile
    */
 
-  this.logger.write(JSON.stringify({
+  function extractClientIP(request) {
+
+    /*
+     * Function SeedlinkWebsocket.logRecordMessage::extractClientIP
+     * Extracts the client IP from the request headers
+     */
+
+    return request.connection.remoteAddress || request.headers["x-forwarded-for"] || null;
+
+  }
+
+  var requestLog = {
     "timestamp": new Date().toISOString(),
     "network": json.network,
     "station": json.station,
@@ -137,32 +151,76 @@ SeedlinkWebsocket.prototype.logRecordMessage = function(request, json) {
     "channel": json.channel,
     "nSamples": json.data.length,
     "agent": request.headers["user-agent"] || null,
-    "client": request.connection.remoteAddress || request.headers["x-forwarded-for"] 
-  }) + "\n");
+    "client": extractClientIP(request)
+  }
+
+  return this.logger.write(JSON.stringify(requestLog) + "\n");
 
 }
 
 SeedlinkWebsocket.prototype.handleIncomingMessage = function(socket, message) {
 
-  /* Function SeedlinkWebsocket.handleIncomingMessage
+  /*
+   * Function SeedlinkWebsocket.handleIncomingMessage
    * Code to handle messages send to the server over the websocket
    */
 
+  const OPERATIONS = new Array("subscribe", "unsubscribe", "channels");
+
+  function isAllowed(x) {
+
+    /*
+     * Function SeedlinkWebsocket.handleIncomingMessage::isAllowed
+     * Returns whether a requested operation is allowed by the websocket server
+     */
+
+    return OPERATIONS.includes(x);
+
+  }
+
   var json = JSON.parse(message);
 
+  // Confirm that the operation is allowed
+  if(!Object.keys(json).every(isAllowed)) {
+    throw new Error("Invalid operation requested. Expected: " + OPERATIONS.join(", "));
+  }
+
+  // Handle the requested operations
   if(json.subscribe) {
     this.subscribe(json.subscribe, socket);
-  } else if(json.unsubscribe) {
+  }
+
+  if(json.unsubscribe) {
     this.unsubscribe(json.unsubscribe, socket);
+  }
+
+  // Request to show the available channels
+  if(json.channels) {
+    this.write(socket, Object.keys(this.channels).join(" "));
+  }
+
+}
+
+SeedlinkWebsocket.prototype.write = function(socket, object) {
+
+  /*
+   * Function SeedlinkWebsocket.write
+   * Writes message to the connected socket
+   */
+
+  // If the passed object is an Error
+  if(object instanceof Error) {
+    return socket.emit("write", {"error": (this.configuration.__DEBUG__ ? object.stack : object.message)});
   } else {
-    throw new Error("Invalid JSON message specified.");
+    return socket.emit("write", {"success": object});
   }
 
 }
 
 SeedlinkWebsocket.prototype.enableHeartbeat = function() {
 
-  /* Function SeedlinkWebsocket.enableHeartbeat
+  /*
+   * Function SeedlinkWebsocket.enableHeartbeat
    * Enable heartbeat polling each connected websocket
    */
 
@@ -176,9 +234,9 @@ SeedlinkWebsocket.prototype.enableHeartbeat = function() {
 
 SeedlinkWebsocket.prototype.checkHeartbeat = function(socket) {
 
-  /* Function SeedlinkWebsocket.checkHeartbeat
-   * Checks whether the socket is still alive and responds
-   * to ping messages
+  /*
+   * Function SeedlinkWebsocket.checkHeartbeat
+   * Checks whether the socket is still alive and responds to ping messages with pong
    */
 
   // Socket did not response to heartbeat since last check
@@ -194,7 +252,8 @@ SeedlinkWebsocket.prototype.checkHeartbeat = function(socket) {
 
 SeedlinkWebsocket.prototype.unsubscribeAll = function(socket) {
 
-  /* Function SeedlinkWebsocket.unsubscribeAll
+  /*
+   * Function SeedlinkWebsocket.unsubscribeAll
    * Unsubscribes socket from all channels
    */
 
@@ -207,10 +266,14 @@ SeedlinkWebsocket.prototype.unsubscribeAll = function(socket) {
 
 SeedlinkWebsocket.prototype.createSeedlinkProxies = function() {
 
-  /* Function SeedlinkWebsocket.createSeedlinkProxies
+  /*
+   * Function SeedlinkWebsocket.createSeedlinkProxies
    * Initializes the configured seedlink proxies
    */
 
+  const SeedlinkProxy = require("./lib/seedlink-proxy");
+
+  // Create a map for the available channels
   this.channels = new Object();
 
   // Read the channel configuration and create new sleeping proxies
@@ -222,7 +285,8 @@ SeedlinkWebsocket.prototype.createSeedlinkProxies = function() {
 
 SeedlinkWebsocket.prototype.getSeedlinkProxy = function(channel) {
 
-  /* Function SeedlinkWebsocket.getSeedlinkProxy
+  /*
+   * Function SeedlinkWebsocket.getSeedlinkProxy
    * Returns the particular seedlink proxy with an identifier
    */
 
@@ -238,7 +302,7 @@ SeedlinkWebsocket.prototype.unsubscribe = function(channel, socket) {
 
   // Sanity check if the channel exists
   if(!this.channelExists(channel)) {
-    return socket.emit("write", {"error": "Invalid unsubscription requested."});
+    return this.write(socket, new Error("Invalid channel unsubscription requested: " + channel));
   }
 
   // Get the particular seedlink proxy
@@ -263,7 +327,7 @@ SeedlinkWebsocket.prototype.subscribe = function(channel, socket) {
    */
 
   if(!this.channelExists(channel)) {
-    return socket.emit("write", {"error": "Invalid subscription requested."});
+    return this.write(socket, new Error("Invalid channel subscription requested: " + channel)); 
   }
 
   // Add the socket to the channel
@@ -277,10 +341,10 @@ module.exports.__VERSION__ = __VERSION__;
 
 if(require.main === module) {
 
-  const CONFIG = require("./config");
+  const configuration = require("./config");
 
   // Start the microservice
-  new module.exports.server(CONFIG, function(name, host, port) {
+  new module.exports.server(configuration, function(name, host, port) {
     console.log(name + " microservice has been started on " + host + ":" + port);
   });
 
