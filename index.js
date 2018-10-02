@@ -13,7 +13,7 @@
 
 "use strict";
 
-const __VERSION__ = "1.0.0";
+const __VERSION__ = "1.1.0";
 
 const SeedlinkWebsocket = function(configuration, callback) {
 
@@ -65,7 +65,7 @@ SeedlinkWebsocket.prototype.attachSocketHandlers = function(socket, request) {
   }
 
   // User feedback that connection is ok
-  this.write(socket, "Connected to Seedlink Proxy.");
+  socket.emit("write", "Connected to Seedlink Proxy.");
 
   socket._receivedHeartbeat = true;
 
@@ -75,9 +75,12 @@ SeedlinkWebsocket.prototype.attachSocketHandlers = function(socket, request) {
   }.bind(this));
 
   // Called when writing to socket
-  socket.on("write", function(json) {
+  socket.on("write", function(object) {
 
-    // Skip succes, error messages to clients
+    // Map the item to write to a JSON object
+    var json = this.mapMessage(object);
+
+    // Write a log for exported mSEED record
     if(!json.success && !json.error) {
       this.logRecordMessage(request, json);
     }
@@ -93,7 +96,7 @@ SeedlinkWebsocket.prototype.attachSocketHandlers = function(socket, request) {
     try {
       this.handleIncomingMessage(socket, message);
     } catch(exception) {
-      this.write(socket, exception);
+      socket.emit("write", exception);
     }
 
   }.bind(this));
@@ -106,6 +109,28 @@ SeedlinkWebsocket.prototype.attachSocketHandlers = function(socket, request) {
 
 }
 
+SeedlinkWebsocket.prototype.mapMessage = function(object) {
+
+  /*
+   * Function SeedlinkWebsocket.mapMessage
+   * Maps the socket message to write to a JSON object
+   */
+
+  // An error was passed
+  if(object instanceof Error) {
+    return new Object({"error": (this.configuration.__DEBUG__ ? object.stack : object.message)});
+  }
+
+  // String was passed
+  if(typeof(object) === "string") {
+    return new Object({"success": object});
+  }
+
+  // An unpacked mSEED record was passed
+  return object;
+
+}
+ 
 SeedlinkWebsocket.prototype.setupLogger = function() {
 
   /*
@@ -151,7 +176,8 @@ SeedlinkWebsocket.prototype.logRecordMessage = function(request, json) {
     "channel": json.channel,
     "nSamples": json.data.length,
     "agent": request.headers["user-agent"] || null,
-    "client": extractClientIP(request)
+    "client": extractClientIP(request),
+    "version": __VERSION__
   }
 
   return this.logger.write(JSON.stringify(requestLog) + "\n");
@@ -196,23 +222,7 @@ SeedlinkWebsocket.prototype.handleIncomingMessage = function(socket, message) {
 
   // Request to show the available channels
   if(json.channels) {
-    this.write(socket, Object.keys(this.channels).join(" "));
-  }
-
-}
-
-SeedlinkWebsocket.prototype.write = function(socket, object) {
-
-  /*
-   * Function SeedlinkWebsocket.write
-   * Writes message to the connected socket
-   */
-
-  // If the passed object is an Error
-  if(object instanceof Error) {
-    return socket.emit("write", {"error": (this.configuration.__DEBUG__ ? object.stack : object.message)});
-  } else {
-    return socket.emit("write", {"success": object});
+    socket.emit("write", Object.keys(this.channels).join(" "));
   }
 
 }
@@ -302,7 +312,7 @@ SeedlinkWebsocket.prototype.unsubscribe = function(channel, socket) {
 
   // Sanity check if the channel exists
   if(!this.channelExists(channel)) {
-    return this.write(socket, new Error("Invalid channel unsubscription requested: " + channel));
+    return socket.emit("write", new Error("Invalid channel unsubscription requested: " + channel));
   }
 
   // Get the particular seedlink proxy
@@ -327,7 +337,7 @@ SeedlinkWebsocket.prototype.subscribe = function(channel, socket) {
    */
 
   if(!this.channelExists(channel)) {
-    return this.write(socket, new Error("Invalid channel subscription requested: " + channel)); 
+    return socket.emit("write", new Error("Invalid channel subscription requested: " + channel)); 
   }
 
   // Add the socket to the channel
