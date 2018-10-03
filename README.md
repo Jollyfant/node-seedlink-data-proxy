@@ -12,6 +12,7 @@ Lightweight NodeJS websocket server capable of communicating over the Seedlink p
   - `__NAME__` - Application name.
   - `HOST` - Hostname exposing the Seedlink proxy server.
   - `PORT` - Port the Seedlink proxy server is exposed on.
+  - `HEARTBEAT_INTERVAL_MS` - Number of miliseconds before checking the socket a ping
 
 ## Channel Configuration
 A channel describes a configured data stream that can be subscribed to and is identified by a name. Each channel will open a single Seedlink connection when users are subscribed. Users that are subscribed to a channel will receive data packets attributed to that particular channel.

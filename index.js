@@ -141,7 +141,7 @@ SeedlinkWebsocket.prototype.mapMessage = function(object) {
   }
 
   // String or object was passed
-  if(typeof(object) === "string" || typeof(object) === "object") {
+  if(typeof(object) === "string") {
     return new Object({"success": object});
   }
 
@@ -217,6 +217,17 @@ SeedlinkWebsocket.prototype.handleIncomingMessage = function(socket, message) {
     "info"
   );
 
+  function formatInfoString(x) {
+
+    /*
+     * Function SeedlinkWebsocket.handleIncomingMessage::formatInfoString
+     * Formats information string for a Seedlink proxy channel
+     */
+
+    return new Array(x.network, x.station, x.location, x.channel).join(".");
+
+  }
+
   function isAllowed(x) {
 
     /*
@@ -247,7 +258,7 @@ SeedlinkWebsocket.prototype.handleIncomingMessage = function(socket, message) {
   // Write information on the selectors
   if(json.info) {
     if(this.channelExists(json.info)) {
-      socket.emit("write", this.getSeedlinkProxy(json.info).selectors);
+      socket.emit("write", this.getSeedlinkProxy(json.info).selectors.map(formatInfoString).join(" "));
     }
   }
 
@@ -265,11 +276,9 @@ SeedlinkWebsocket.prototype.enableHeartbeat = function() {
    * Enable heartbeat polling each connected websocket
    */
 
-  const HEARTBEAT_INTERVAL_MS = 60000;
-
   this.interval = setInterval(function() {
     this.websocket.clients.forEach(this.checkHeartbeat);
-  }.bind(this), HEARTBEAT_INTERVAL_MS);
+  }.bind(this), this.configuration.HEARTBEAT_INTERVAL_MS);
 
 }
 
