@@ -13,6 +13,9 @@
 
 "use strict";
 
+// Global patch the require method
+require("./require");
+
 const __VERSION__ = "1.1.0";
 
 const SeedlinkWebsocket = function(configuration, callback) {
@@ -39,10 +42,27 @@ const SeedlinkWebsocket = function(configuration, callback) {
   // Create all channels
   this.createSeedlinkProxies();
 
+  // Enable pinging of clients
+  this.enableHeartbeat();
+
   // When a connection is made to the websocket
   this.websocket.on("connection", this.attachSocketHandlers.bind(this));
 
   callback(configuration.__NAME__, host, port);
+
+}
+
+SeedlinkWebsocket.prototype.close = function(callback) {
+
+  /*
+   * Function SeedlinkWebsocket.close
+   * Attaches listeners to the websocket
+   */
+
+  // Clear the heartbeat interval
+  clearInterval(this.interval);
+
+  this.websocket.close(callback);
 
 }
 
@@ -103,9 +123,6 @@ SeedlinkWebsocket.prototype.attachSocketHandlers = function(socket, request) {
 
   // Set the pong listener
   socket.on("pong", heartbeat);
-
-  // Enable pinging of clients
-  this.enableHeartbeat();
 
 }
 
@@ -222,7 +239,7 @@ SeedlinkWebsocket.prototype.handleIncomingMessage = function(socket, message) {
 
   // Request to show the available channels
   if(json.channels) {
-    socket.emit("write", Object.keys(this.channels).join(" "));
+    socket.emit("write", Object.keys(this.channels).sort().join(" "));
   }
 
 }
@@ -236,7 +253,7 @@ SeedlinkWebsocket.prototype.enableHeartbeat = function() {
 
   const HEARTBEAT_INTERVAL_MS = 60000;
 
-  setInterval(function() {
+  this.interval = setInterval(function() {
     this.websocket.clients.forEach(this.checkHeartbeat);
   }.bind(this), HEARTBEAT_INTERVAL_MS);
 
@@ -322,7 +339,8 @@ SeedlinkWebsocket.prototype.unsubscribe = function(channel, socket) {
 
 SeedlinkWebsocket.prototype.channelExists = function(channel) {
 
-  /* Function SeedlinkWebsocket.channelExists
+  /*
+   * Function SeedlinkWebsocket.channelExists
    * Checks whether a channel name has been configured
    */
 
@@ -332,7 +350,8 @@ SeedlinkWebsocket.prototype.channelExists = function(channel) {
 
 SeedlinkWebsocket.prototype.subscribe = function(channel, socket) {
 
-  /* Function SeedlinkWebsocket.subscribe
+  /*
+   * Function SeedlinkWebsocket.subscribe
    * Subscribes from a particular data Seedlink stream
    */
 

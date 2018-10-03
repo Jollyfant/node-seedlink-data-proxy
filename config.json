@@ -1,5 +1,5 @@
 {
-  "__DEBUG__": true,
+  "__DEBUG__": false,
   "__NAME__": "nodejs-seedlink-data-proxy",
   "HOST": "0.0.0.0",
   "PORT": 8089
