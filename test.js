@@ -11,18 +11,24 @@
 
 "use strict";
 
+require("./require");
+
 if(require.main === module) {
 
-  var Seedlink = require("./index");
+  var { Server } = require("./lib/seedlink-websocket");
   var configuration = require("./config");
 
   // Set debug to false
   configuration.__DEBUG__ = false;
 
-  var SeedlinkSocket = new Seedlink.server(configuration);
+  new Server(configuration, function() {
 
-  // Run all tests and close the socket at the end
-  runTests(Object.values(require("./testSuite")), SeedlinkSocket.close.bind(SeedlinkSocket));
+    console.log(this.name + " microservice has been started on " + this.host + ":" + this.port);
+
+    // Run all tests and close the socket at the end
+    runTests(Object.values(require("./test/testSuite")), this.close.bind(this));
+
+  });
 
 }
 
@@ -52,6 +58,7 @@ function runTests(testSuite, callback) {
 
     currentTest(function(error) {
 
+      // One test has failed
       if(error) {
         throw(currentTest.name + " " + error.stack);
       }

@@ -16,7 +16,7 @@ var configuration = require("./config");
 var channels = require("./channel-config");
 
 const WS_NORMAL_CLOSURE = 1000; 
-const WS_INTERNAL_ERROR = 1011;
+const WS_ABNORMAL_CLOSURE = 1011;
 
 function createWebsocket(proceed) {
 
@@ -35,7 +35,7 @@ function createWebsocket(proceed) {
     switch(code) {
       case WS_NORMAL_CLOSURE:
         return proceed(false);
-      case WS_INTERNAL_ERROR:
+      case WS_ABNORMAL_CLOSURE:
         return proceed(new Error("Fatal exception occured in test."));
       default:
         return proceed(new Error("Unknown websocket error code."));
@@ -76,7 +76,7 @@ function testRecord(proceed) {
 
     // Assert that a data array is passed
     if(!Array.isArray(json.data)) {
-      return websocket.close(WS_INTERNAL_ERROR);
+      return websocket.close(WS_ABNORMAL_CLOSURE);
     }
 
     websocket.close(WS_NORMAL_CLOSURE);
@@ -103,7 +103,7 @@ function testOperationError(proceed) {
   websocket.on("message", function(data) {
 
     if(data !== JSON.stringify({"error": "Invalid operation requested. Expected: subscribe, unsubscribe, channels, info"})) {
-      return websocket.close(WS_INTERNAL_ERROR);
+      return websocket.close(WS_ABNORMAL_CLOSURE);
     }
 
     websocket.close(WS_NORMAL_CLOSURE);
@@ -132,7 +132,7 @@ function testSubscriptionSuccess(proceed) {
   websocket.on("message", function(data) {
 
     if(data !== JSON.stringify({"success": "Subscribed to channel " + requestedChannel + "."})) {
-      return websocket.close(WS_INTERNAL_ERROR);
+      return websocket.close(WS_ABNORMAL_CLOSURE);
     }
 
     websocket.close(WS_NORMAL_CLOSURE);
@@ -160,7 +160,7 @@ function testChannels(proceed) {
 
     // Assert that the response is what we expect
     if(data !== JSON.stringify({"success": channels.map(x => x.name).sort().join(" ")})) {
-      return websocket.close(WS_INTERNAL_ERROR);
+      return websocket.close(WS_ABNORMAL_CLOSURE);
     }
 
     return websocket.close(WS_NORMAL_CLOSURE);
