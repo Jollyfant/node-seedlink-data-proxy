@@ -13,9 +13,6 @@
 
 "use strict";
 
-// Global patch the require method
-//require("./require");
-
 const __VERSION__ = "1.1.0";
 
 const SeedlinkWebsocket = function(configuration, callback) {
