@@ -28,10 +28,10 @@ const SeedlinkWebsocket = function(configuration, callback) {
 
   // Get process environment variables (Docker)
   var host = process.env.SERVICE_HOST || this.configuration.HOST;
-  var port = Number(process.env.SERVICE_PORT) || this.configuration.PORT;
+  var port = Number(process.env.SERVICE_PORT) || Number(this.configuration.PORT);
 
   // Create a websocket server
-  this.websocket = new websocket.Server({"host": host, "port": port});
+  this.websocket = new websocket.Server({ host, port });
 
   // Create a logger
   this.logger = this.setupLogger();
@@ -44,6 +44,10 @@ const SeedlinkWebsocket = function(configuration, callback) {
 
   // When a connection is made to the websocket
   this.websocket.on("connection", this.attachSocketHandlers.bind(this));
+
+  // Signal received: close server
+  process.once("SIGINT", this.close.bind(this));
+  process.once("SIGTERM", this.close.bind(this));
 
   // Callback if passed
   if(callback instanceof Function) {

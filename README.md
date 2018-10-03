@@ -1,5 +1,5 @@
 # nodejs-seedlink-data-proxy
-Lightweight NodeJS server capable of communicating over the Seedlink protocol, broadcasting unpacked data samples through HTML5 websockets. When a client connects to the proxy server, a connection is relayed over the seedlink protocol. This connection is severed when no clients are available and kept alive while clients are connected. The server has support for streaming data from multiple remote Seedlink servers to different subscribers.
+Lightweight NodeJS websocket server capable of communicating over the Seedlink protocol. The server broadcasts unpacked mSEED data samples through HTML5 websockets. When a client connects to the proxy server, a connection is relayed to a configured seedlink protocol. The server supports data streaming from multiple remote Seedlink servers & channels to different subscribers.
 
 
 ## Installation
@@ -7,46 +7,50 @@ Lightweight NodeJS server capable of communicating over the Seedlink protocol, b
     npm install
 
 ## Configuration
-Modify config.json to suit your needs.
+
+  - `__DEBUG__` Sets application in debug mode.
+  - `__NAME__` - Application name.
+  - `HOST` - Hostname exposing the Seedlink proxy server.
+  - `PORT` - Port the Seedlink proxy server is exposed on.
 
 ## Channel Configuration
-A channel describes a configured data stream that can be subscribed to and is identified by a name. Each channel will create a single Seedlink connection when users are subscribed. Users that are subscribed to a channel will receive data packets attributed to that particular channel.
+A channel describes a configured data stream that can be subscribed to and is identified by a name. Each channel will open a single Seedlink connection when users are subscribed. Users that are subscribed to a channel will receive data packets attributed to that particular channel.
+
+## Testing
+
+    npm test
 
 ## Running
 
-    node index.js
+    npm start
 
 ## Docker
 
     docker build -t seedlink-proxy:1.0 .
     docker run -p 8087:8087 [--rm] [-d] [-e "SERVICE_PORT=8087"] [-e "SERVICE_HOST=0.0.0.0"] seedlink-proxy:1.0
 
-Four envrionment variables can passed to Docker run to modify settings at runtime. Otherwise information is read from the built configuration file.
+Two envrionment variables can passed to Docker run to modify settings at runtime. Otherwise information is read from the built configuration file.
 
   * SERVICE\_HOST
   * SERVICE\_PORT
 
-## Websocket API
-To communicate with the websocket server you will need to write an (un)subscription to the socket:
+## Client Example
+For an example of the client websocket look for `index.html`.
 
+## Websocket API
+To communicate with the websocket server you will need to write an operation (e.g. (un)subscription) to the socket:
+
+    // Subscribe and unsubscribe from a channel
     {"subscribe": "NL.HGN"}
     {"unsubscribe": "NL.HGN"}
 
-Once accepted, the server will start writing over the websocket. An unlimited number of subscriptions can be active per user.
+    // Get a list of the available channels
+    {"channels": true} 
 
-## Client Example
+Once a subscription is accepted, the server will start writing over the websocket. An unlimited number of subscriptions can be active per user.
 
-    var exampleSocket = new WebSocket("ws://0.0.0.0:8087");
-
-    exampleSocket.onopen = function(event) {
-        exampleSocket.send(JSON.stringify({"subscribe": "NL.HGN"}));
-    }
-
-    exampleSocket.onmessage = function(event) {
-        console.log(event.data);
-    }
-
-Will starting receiving data from configured channel `NL.HGN`:
+## Unpacked mSEED structure
+The unpacked mSEED will be formatted as JSON with the following data (samples) & metadata.
 
     {
         "start": 1531139771269,
