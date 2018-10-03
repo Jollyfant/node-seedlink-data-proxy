@@ -140,8 +140,8 @@ SeedlinkWebsocket.prototype.mapMessage = function(object) {
     return new Object({"error": (this.configuration.__DEBUG__ ? object.stack : object.message)});
   }
 
-  // String was passed
-  if(typeof(object) === "string") {
+  // String or object was passed
+  if(typeof(object) === "string" || typeof(object) === "object") {
     return new Object({"success": object});
   }
 
@@ -213,7 +213,8 @@ SeedlinkWebsocket.prototype.handleIncomingMessage = function(socket, message) {
   const OPERATIONS = new Array(
     "subscribe",
     "unsubscribe",
-    "channels"
+    "channels",
+    "info"
   );
 
   function isAllowed(x) {
@@ -241,6 +242,13 @@ SeedlinkWebsocket.prototype.handleIncomingMessage = function(socket, message) {
 
   if(json.unsubscribe) {
     this.unsubscribe(json.unsubscribe, socket);
+  }
+
+  // Write information on the selectors
+  if(json.info) {
+    if(this.channelExists(json.info)) {
+      socket.emit("write", this.getSeedlinkProxy(json.info).selectors);
+    }
   }
 
   // Request to show the available channels
