@@ -1,15 +1,49 @@
+/*
+ * NodeJS Seedlink Proxy testSuite
+ *
+ * Wrapper for the test suite for this application
+ *
+ * Copyright: ORFEUS Data Center, 2018
+ * Author: Mathijs Koymans
+ * Licensed under MIT
+ *
+ */
+
+"use strict";
+
 var WebSocket = require("ws");
 var configuration = require("./config");
 var channels = require("./channel-config");
 
-function createWebsocket() {
+const WS_NORMAL_CLOSURE = 1000; 
+const WS_ABNORMAL_CLOSURE = 1006;
+
+function createWebsocket(proceed) {
 
   /*
    * Function createWebsocket
-   * Creates a new websocket connection
+   * Creates a new websocket connection that can be used for a single test
+   * The proceed callback must be passed and will be executed after the test finished
+   * and the websocket was closed
    */
 
-  return new WebSocket('ws://' + configuration.HOST + ":" + configuration.PORT);
+  var websocket = new WebSocket("ws://" + configuration.HOST + ":" + configuration.PORT);
+
+  // Wait for the websocket to close before proceeding
+  websocket.on("close", function(code) {
+
+    switch(code) {
+      case WS_NORMAL_CLOSURE:
+        return proceed(false);
+      case WS_ABNORMAL_CLOSURE:
+        return proceed(new Error("Fatal exception occured in test."));
+      default:
+        return proceed(new Error("Unknown websocket error code."));
+    }
+
+  });
+
+  return websocket;
 
 }
 
@@ -20,10 +54,8 @@ function testRecord(proceed) {
    * Tests whether an unpacked record is returned after subscription
    */
 
-  const error = new Error("Test failure in " + arguments.callee.name);
-
   // Open a new websocket
-  var websocket = createWebsocket();
+  var websocket = createWebsocket(proceed);
 
   var requestedChannel = channels.map(x => x.name).sort().pop();
 
@@ -35,21 +67,19 @@ function testRecord(proceed) {
   websocket.on("message", function(data) {
 
     // Parse the message
-    json = JSON.parse(data);
+    var json = JSON.parse(data);
 
     // Ignore subscription message
     if(json.success) {
       return;
     }
 
-    websocket.close();
-
     // Assert that a data array is passed
     if(!Array.isArray(json.data)) {
-      return proceed(error);
+      return websocket.close(WS_ABNORMAL_CLOSURE);
     }
 
-    proceed(false);
+    websocket.close(WS_NORMAL_CLOSURE);
 
   });
 
@@ -62,10 +92,8 @@ function testOperationError(proceed) {
    * Tests whether an invalid operation returns an error
    */
 
-  const error = new Error("Test failure in " + arguments.callee.name);
-
   // Open a new websocket
-  var websocket = createWebsocket();
+  var websocket = createWebsocket(proceed);
 
   // Write the channel request
   websocket.on("open", function() {
@@ -74,13 +102,11 @@ function testOperationError(proceed) {
 
   websocket.on("message", function(data) {
 
-    websocket.close();
-
     if(data !== JSON.stringify({"error": "Invalid operation requested. Expected: subscribe, unsubscribe, channels"})) {
-      return proceed(error);
+      return websocket.close(WS_ABNORMAL_CLOSURE);
     }
 
-    proceed(false);
+    websocket.close(WS_NORMAL_CLOSURE);
 
   });
 
@@ -93,10 +119,8 @@ function testSubscriptionSuccess(proceed) {
    * Tests whether a subscription returns a success message
    */
 
-  const error = new Error("Test failure in " + arguments.callee.name);
-
   // Open a new websocket
-  var websocket = createWebsocket();
+  var websocket = createWebsocket(proceed);
 
   var requestedChannel = channels.map(x => x.name).sort().pop();
 
@@ -107,13 +131,11 @@ function testSubscriptionSuccess(proceed) {
 
   websocket.on("message", function(data) {
 
-    websocket.close();
-
-    if(data.success && data !== JSON.stringify({"success": "Subscribed to channel " + requestedChannel + "."})) {
-      return proceed(error);
+    if(data !== JSON.stringify({"success": "Subscribed to channel " + requestedChannel + "."})) {
+      return websocket.close(WS_ABNORMAL_CLOSURE);
     }
 
-    proceed(false);
+    websocket.close(WS_NORMAL_CLOSURE);
 
   });
 
@@ -126,10 +148,8 @@ function testChannels(proceed) {
    * Tests the channel command
    */
 
-  const error = new Error("Test failure in " + arguments.callee.name);
-
   // Open a new websocket
-  var websocket = createWebsocket();
+  var websocket = createWebsocket(proceed);
 
   // Write the channel request
   websocket.on("open", function() {
@@ -138,15 +158,12 @@ function testChannels(proceed) {
 
   websocket.on("message", function(data) {
 
-    // Close the remote websocket
-    websocket.close();
-
     // Assert that the response is what we expect
     if(data !== JSON.stringify({"success": channels.map(x => x.name).sort().join(" ")})) {
-      return proceed(error);
+      return websocket.close(WS_ABNORMAL_CLOSURE);
     }
 
-    proceed(false);
+    return websocket.close(WS_NORMAL_CLOSURE);
 
   });
 

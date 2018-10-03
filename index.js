@@ -14,7 +14,7 @@
 "use strict";
 
 // Global patch the require method
-require("./require");
+//require("./require");
 
 const __VERSION__ = "1.1.0";
 
@@ -48,7 +48,10 @@ const SeedlinkWebsocket = function(configuration, callback) {
   // When a connection is made to the websocket
   this.websocket.on("connection", this.attachSocketHandlers.bind(this));
 
-  callback(configuration.__NAME__, host, port);
+  // Callback if passed
+  if(callback instanceof Function) {
+    callback(configuration.__NAME__, host, port);
+  }
 
 }
 
@@ -59,7 +62,7 @@ SeedlinkWebsocket.prototype.close = function(callback) {
    * Attaches listeners to the websocket
    */
 
-  // Clear the heartbeat interval
+  // Clear the heartbeat interval otherwise the process
   clearInterval(this.interval);
 
   this.websocket.close(callback);
@@ -90,9 +93,7 @@ SeedlinkWebsocket.prototype.attachSocketHandlers = function(socket, request) {
   socket._receivedHeartbeat = true;
 
   // Socket was closed: unsubscribe from all rooms
-  socket.on("close", function() {
-    this.unsubscribeAll(socket);
-  }.bind(this));
+  socket.on("close", () => this.unsubscribeAll(socket));
 
   // Called when writing to socket
   socket.on("write", function(object) {
@@ -208,7 +209,11 @@ SeedlinkWebsocket.prototype.handleIncomingMessage = function(socket, message) {
    * Code to handle messages send to the server over the websocket
    */
 
-  const OPERATIONS = new Array("subscribe", "unsubscribe", "channels");
+  const OPERATIONS = new Array(
+    "subscribe",
+    "unsubscribe",
+    "channels"
+  );
 
   function isAllowed(x) {
 

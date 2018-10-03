@@ -1,3 +1,14 @@
+/*
+ * NodeJS Seedlink Proxy test
+ *
+ * Code that initializes the test suite
+ *
+ * Copyright: ORFEUS Data Center, 2018
+ * Author: Mathijs Koymans
+ * Licensed under MIT
+ *
+ */
+
 "use strict";
 
 if(require.main === module) {
@@ -8,38 +19,44 @@ if(require.main === module) {
   // Set debug to false
   configuration.__DEBUG__ = false;
 
-  var SeedlinkSocket = new Seedlink.server(configuration, function(name, host, port) {
-    console.log(name + " microservice has been started on " + host + ":" + port);
-  });
+  var SeedlinkSocket = new Seedlink.server(configuration);
 
-  // Run all tests
-  runTests(Object.values(require("./testSuite")), finish);
+  // Run all tests and close the socket at the end
+  runTests(Object.values(require("./testSuite")), SeedlinkSocket.close.bind(SeedlinkSocket));
 
 }
 
-function runTests(tests, callback) {
+function runTests(testSuite, callback) {
 
   /*
    * Function runTests
    * Runs an array of asynchronous tests in sequence
    */
 
-  var next;
-  var nTests = tests.length;
-  var start = Date.now();
+  var next, currentTest;
+  var nTests = testSuite.length;
+
+  console.log("Begin running test suite with " + nTests + " tests.");
 
   (next = function() {
 
+    var start = Date.now();
+
     // No more tests to run
-    if(tests.length === 0) {
-      return finish(nTests, Date.now() - start);
+    if(testSuite.length === 0) {
+      return callback();
     }
 
-    tests.pop()(function(error) {
+    // Pop the next test off the stack and execute
+    currentTest = testSuite.pop();
+
+    currentTest(function(error) {
 
       if(error) {
-        throw(error);
+        throw(currentTest.name + " " + error.stack);
       }
+
+      console.log(currentTest.name + " succesfully completed in " + (Date.now() - start) + "ms.");
 
       // Proceed with the next test
       next();
@@ -47,18 +64,5 @@ function runTests(tests, callback) {
     });
 
   })();
-
-}
-
-function finish(n, time) {
-
-  /*
-   * Function finish
-   * Finishes the test suite
-   */
-
-  SeedlinkSocket.close(function() {
-    console.log("The test suite has succesfully ran " + n + " tests in " + time + "ms.");
-  });
 
 }
