@@ -3,5 +3,7 @@
   "__NAME__": "nodejs-seedlink-data-proxy",
   "HEARTBEAT_INTERVAL_MS": 60000,
   "HOST": "0.0.0.0",
-  "PORT": 8089
+  "PORT": 8089,
+  "PREFILL": 0,
+  "RECONNECT_INTERVAL_MS": 60000
 }
